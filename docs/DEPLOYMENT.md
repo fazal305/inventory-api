@@ -50,6 +50,61 @@ it is a deliberate one, made with a specific host in mind.
    because it worked on this machine (§50: "verify the actual production
    API rather than assuming it works").
 
-I have not done any of the above. Say the word — and name a target host —
-if you want to actually deploy, and I'll walk through it with you rather
-than assume a provider on your behalf.
+## Chosen host: free PHP/MySQL shared hosting (e.g. InfinityFree)
+
+This kind of host has one structural constraint the requirements above
+don't cover: **you can't point the document root at `public/`** — the
+control panel gives you a fixed `htdocs/` folder as the only web-accessible
+directory, with no option to change it. Everything else (`src/`, `database/`,
+`.env`) needs to live *outside* `htdocs/` so it's never reachable by URL —
+the same principle behind `public/` existing at all, just enforced by the
+host instead of by web server config.
+
+The fix is a two-line **bootstrap file**, not a second copy of the app:
+
+```
+home/                              (your FTP root — not all web-accessible)
+├── htdocs/                        (the ONLY web-accessible folder)
+│   ├── index.php                  (2 lines — see below)
+│   └── .htaccess                  (copy of public/.htaccess)
+└── inventory-api/                 (the entire project, uploaded as-is)
+    ├── public/index.php           (the real front controller — unchanged)
+    ├── src/ ...
+    ├── database/ ...
+    └── .env                       (production values — never the local ones)
+```
+
+`htdocs/index.php` is just:
+```php
+<?php
+require __DIR__ . '/../inventory-api/public/index.php';
+```
+Because the real `public/index.php` still resolves its own `__DIR__`
+correctly wherever it's `require`d from, every `../src/...`,
+`../.env` path inside it keeps working with zero code changes — the
+bootstrap file is the only host-specific artifact, not a fork of the app.
+
+### Steps
+
+1. **You create the account** — I can't sign up for a hosting account on
+   your behalf (that's outside what I can do here). Sign up at your chosen
+   free host, create a subdomain/hosting slot, and from its control panel:
+   - create a MySQL database (note the DB host, name, username, password —
+     free hosts almost always use a **different** MySQL host than
+     `localhost`, e.g. `sqlXXX.infinityfree.com`)
+   - find your FTP credentials (host, username, password)
+2. **Hand me the connection details** (FTP host/user/pass, MySQL
+   host/name/user/pass) — not your hosting account's login password, just
+   these service credentials, the same way you'd hand any deploy tool its
+   config.
+3. I'll then:
+   - upload `inventory-api/` (minus `.git`) via FTP
+   - create `inventory-api/.env` on the server with the real DB credentials
+     and the deployed origin in `CORS_ALLOWED_ORIGINS`
+   - create `htdocs/index.php` (the bootstrap) and `htdocs/.htaccess`
+   - run `database/migrate.php` (and `seed.php` if you want sample data)
+     against the remote database
+   - verify the *actual deployed* API with real HTTP requests — the same
+     `curl` checks used throughout this project, now against the live URL
+
+Nothing above has been done yet — this is the plan, waiting on step 1.

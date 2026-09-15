@@ -1,0 +1,10 @@
+RewriteEngine On
+
+# Every request that isn't a real file or directory goes to index.php —
+# the Apache equivalent of the router argument passed to PHP's built-in
+# server locally (php -S ... public/index.php). Without this, Apache would
+# 404 on /api/v1/products/5 directly instead of letting the app's own
+# Router match it.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
