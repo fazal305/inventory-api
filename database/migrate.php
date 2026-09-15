@@ -20,8 +20,15 @@ use App\Config\Env;
 
 Env::load(__DIR__ . '/../.env');
 $pdo = Database::connection();
+$driver = Database::driver();
 
-$pdo->exec(<<<SQL
+$pdo->exec($driver === 'pgsql' ? <<<SQL
+    CREATE TABLE IF NOT EXISTS migrations (
+        id SERIAL PRIMARY KEY,
+        migration VARCHAR(255) NOT NULL UNIQUE,
+        applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+SQL : <<<SQL
     CREATE TABLE IF NOT EXISTS migrations (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         migration VARCHAR(255) NOT NULL,
@@ -32,7 +39,7 @@ SQL);
 
 $applied = $pdo->query('SELECT migration FROM migrations')->fetchAll(PDO::FETCH_COLUMN);
 
-$files = glob(__DIR__ . '/migrations/*.sql');
+$files = glob(__DIR__ . "/migrations/{$driver}/*.sql");
 sort($files);
 
 $ran = 0;

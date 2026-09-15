@@ -52,13 +52,15 @@ final class CategoryRepository
         try {
             $stmt->execute(['name' => $name, 'slug' => $slug, 'description' => $description]);
         } catch (PDOException $e) {
-            // 23000 = integrity constraint violation (unique name or slug).
-            // The app already checked name uniqueness before this call — this
-            // catch is the real backstop against the race between that check
-            // and this insert, and against a slug collision from two
+            // 23000 = MySQL's generic integrity-constraint-violation SQLSTATE;
+            // 23505 = Postgres's specific unique-violation SQLSTATE. Either
+            // way this is a unique constraint on name or slug. The app
+            // already checked name uniqueness before this call — this catch
+            // is the real backstop against the race between that check and
+            // this insert, and against a slug collision from two
             // differently-named categories (e.g. "Home & Garden" / "Home And
             // Garden" both slugifying to "home-garden").
-            if ($e->getCode() === '23000') {
+            if (in_array($e->getCode(), ['23000', '23505'], true)) {
                 throw new ApiException('DUPLICATE_CATEGORY', 'A category with this name already exists.', 409);
             }
             throw $e;
@@ -78,7 +80,7 @@ final class CategoryRepository
         try {
             $stmt->execute([...$fields, 'id' => $id]);
         } catch (PDOException $e) {
-            if ($e->getCode() === '23000') {
+            if (in_array($e->getCode(), ['23000', '23505'], true)) {
                 throw new ApiException('DUPLICATE_CATEGORY', 'A category with this name already exists.', 409);
             }
             throw $e;

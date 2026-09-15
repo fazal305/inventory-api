@@ -19,6 +19,7 @@ use App\Config\Env;
 
 Env::load(__DIR__ . '/../../.env');
 $pdo = Database::connection();
+$driver = Database::driver();
 
 $categories = [
     ['name' => 'Electronics', 'slug' => 'electronics', 'description' => 'Devices, accessories, and components.'],
@@ -27,9 +28,12 @@ $categories = [
     ['name' => 'Groceries', 'slug' => 'groceries', 'description' => 'Packaged food and household consumables.'],
 ];
 
-$insertCategory = $pdo->prepare(
-    'INSERT IGNORE INTO categories (name, slug, description) VALUES (:name, :slug, :description)'
-);
+// MySQL's INSERT IGNORE has no direct Postgres equivalent — ON CONFLICT
+// DO NOTHING needs an explicit conflict target (the column with the unique
+// constraint) instead of ignoring any constraint violation generically.
+$insertCategory = $pdo->prepare($driver === 'pgsql'
+    ? 'INSERT INTO categories (name, slug, description) VALUES (:name, :slug, :description) ON CONFLICT (name) DO NOTHING'
+    : 'INSERT IGNORE INTO categories (name, slug, description) VALUES (:name, :slug, :description)');
 foreach ($categories as $category) {
     $insertCategory->execute($category);
 }
@@ -60,10 +64,11 @@ foreach ($catalog as $slug => $names) {
     }
 }
 
-$insertProduct = $pdo->prepare(
-    'INSERT IGNORE INTO products (category_id, name, sku, description, price, quantity)
-     VALUES (:category_id, :name, :sku, :description, :price, :quantity)'
-);
+$insertProduct = $pdo->prepare($driver === 'pgsql'
+    ? 'INSERT INTO products (category_id, name, sku, description, price, quantity)
+       VALUES (:category_id, :name, :sku, :description, :price, :quantity) ON CONFLICT (sku) DO NOTHING'
+    : 'INSERT IGNORE INTO products (category_id, name, sku, description, price, quantity)
+       VALUES (:category_id, :name, :sku, :description, :price, :quantity)');
 
 $count = 0;
 foreach ($products as $product) {

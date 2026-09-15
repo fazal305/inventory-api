@@ -118,19 +118,22 @@ final class ProductRepository
 
     /**
      * MySQL reports both a duplicate unique key and a failed foreign key as
-     * SQLSTATE 23000 — the driver-specific error code (1062 vs 1452) is what
-     * actually distinguishes them, so the backstop here has to check that,
-     * not just the SQLSTATE, to return the right error code to the client.
+     * the generic SQLSTATE 23000 — its driver-specific error code (1062 vs
+     * 1452) is what actually distinguishes them. Postgres, by contrast,
+     * gives each its own distinct SQLSTATE (23505 vs 23503) directly, no
+     * driver code needed. Checking both signatures here means this one
+     * method works correctly under either driver.
      */
     private function translate(PDOException $e): ApiException
     {
+        $sqlState = $e->errorInfo[0] ?? null;
         $driverCode = $e->errorInfo[1] ?? null;
 
-        if ($driverCode === 1062) {
+        if ($driverCode === 1062 || $sqlState === '23505') {
             return new ApiException('DUPLICATE_SKU', 'A product with this SKU already exists.', 409);
         }
 
-        if ($driverCode === 1452) {
+        if ($driverCode === 1452 || $sqlState === '23503') {
             return new ApiException('INVALID_CATEGORY', 'category_id does not reference an existing category.', 422);
         }
 
