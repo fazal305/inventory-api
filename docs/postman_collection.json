@@ -1,0 +1,388 @@
+{
+  "info": {
+    "name": "Inventory Management REST API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Auth, Categories, Products, query features, and the full set of documented failure cases. Set the `base_url` and `email`/`password` collection variables (or just run Auth > Register then Login) before running the protected requests."
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1" },
+    { "key": "email", "value": "postman@example.com" },
+    { "key": "password", "value": "secret123" },
+    { "key": "token", "value": "" },
+    { "key": "category_id", "value": "" },
+    { "key": "product_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": { "method": "GET", "url": "{{base_url}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+          }
+        },
+        {
+          "name": "Register - duplicate email (409)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('409 Conflict', () => pm.response.to.have.status(409));", "pm.test('DUPLICATE_EMAIL', () => pm.expect(pm.response.json().error.code).to.eql('DUPLICATE_EMAIL'));"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+          }
+        },
+        {
+          "name": "Register - validation error (422)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('422', () => pm.response.to.have.status(422));"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}" }
+          }
+        },
+        {
+          "name": "Login - wrong password (401)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"wrong-password\"\n}" }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                "const body = pm.response.json();",
+                "pm.collectionVariables.set('token', body.data.token);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+          }
+        },
+        {
+          "name": "Logout - no token (401)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] }
+          }],
+          "request": { "method": "POST", "url": "{{base_url}}/auth/logout" }
+        },
+        {
+          "name": "Logout",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/logout"
+          }
+        },
+        {
+          "name": "Logout - reused revoked token (401)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/logout"
+          }
+        },
+        {
+          "name": "Login (re-authenticate for the rest of the collection)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                "pm.collectionVariables.set('token', pm.response.json().data.token);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        { "name": "List categories", "request": { "method": "GET", "url": "{{base_url}}/categories" } },
+        { "name": "Get category", "request": { "method": "GET", "url": "{{base_url}}/categories/1" } },
+        {
+          "name": "Get category - not found (404)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('404', () => pm.response.to.have.status(404));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/categories/999999" }
+        },
+        {
+          "name": "Get category - invalid id (400)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/categories/abc" }
+        },
+        {
+          "name": "Create category - no token (401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/categories",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Category\"\n}" }
+          }
+        },
+        {
+          "name": "Create category",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('201', () => pm.response.to.have.status(201));",
+                "pm.collectionVariables.set('category_id', pm.response.json().data.id);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/categories",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Category\",\n  \"description\": \"Created from Postman.\"\n}" }
+          }
+        },
+        {
+          "name": "Create category - duplicate name (409)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('409', () => pm.response.to.have.status(409));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/categories",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Category\"\n}" }
+          }
+        },
+        {
+          "name": "Update category (PUT)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PUT", "url": "{{base_url}}/categories/{{category_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Category Renamed\",\n  \"description\": \"Renamed.\"\n}" }
+          }
+        },
+        {
+          "name": "Update category (PATCH)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PATCH", "url": "{{base_url}}/categories/{{category_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Patched.\"\n}" }
+          }
+        },
+        {
+          "name": "Delete category with products (409)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('409', () => pm.response.to.have.status(409));"] } }],
+          "request": {
+            "method": "DELETE", "url": "{{base_url}}/categories/1",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Delete category",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('204', () => pm.response.to.have.status(204));"] } }],
+          "request": {
+            "method": "DELETE", "url": "{{base_url}}/categories/{{category_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        { "name": "List products", "request": { "method": "GET", "url": "{{base_url}}/products" } },
+        { "name": "Get product", "request": { "method": "GET", "url": "{{base_url}}/products/1" } },
+        {
+          "name": "Get product - not found (404)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('404', () => pm.response.to.have.status(404));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/products/999999" }
+        },
+        {
+          "name": "Create product - no token (401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Widget\",\n  \"sku\": \"SKU-POSTMAN-1\",\n  \"category_id\": 1,\n  \"price\": 19.99,\n  \"quantity\": 5\n}" }
+          }
+        },
+        {
+          "name": "Create product",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('201', () => pm.response.to.have.status(201));",
+                "pm.collectionVariables.set('product_id', pm.response.json().data.id);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Widget\",\n  \"sku\": \"SKU-POSTMAN-1\",\n  \"category_id\": 1,\n  \"price\": 19.99,\n  \"quantity\": 5,\n  \"description\": \"Created from Postman.\"\n}" }
+          }
+        },
+        {
+          "name": "Create product - duplicate SKU (409)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('409', () => pm.response.to.have.status(409));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Dup\",\n  \"sku\": \"SKU-POSTMAN-1\",\n  \"category_id\": 1,\n  \"price\": 9.99,\n  \"quantity\": 1\n}" }
+          }
+        },
+        {
+          "name": "Create product - invalid category (422)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('422', () => pm.response.to.have.status(422));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Bad Category\",\n  \"sku\": \"SKU-POSTMAN-2\",\n  \"category_id\": 999999,\n  \"price\": 9.99,\n  \"quantity\": 1\n}" }
+          }
+        },
+        {
+          "name": "Create product - negative price (422)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('422', () => pm.response.to.have.status(422));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Neg Price\",\n  \"sku\": \"SKU-POSTMAN-3\",\n  \"category_id\": 1,\n  \"price\": -5,\n  \"quantity\": 1\n}" }
+          }
+        },
+        {
+          "name": "Create product - negative quantity (422)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('422', () => pm.response.to.have.status(422));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Neg Qty\",\n  \"sku\": \"SKU-POSTMAN-4\",\n  \"category_id\": 1,\n  \"price\": 5,\n  \"quantity\": -1\n}" }
+          }
+        },
+        {
+          "name": "Update product (PUT)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PUT", "url": "{{base_url}}/products/{{product_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Widget v2\",\n  \"sku\": \"SKU-POSTMAN-1\",\n  \"category_id\": 2,\n  \"price\": 24.99,\n  \"quantity\": 10\n}" }
+          }
+        },
+        {
+          "name": "Update product (PATCH)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PATCH", "url": "{{base_url}}/products/{{product_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 50\n}" }
+          }
+        },
+        {
+          "name": "Delete product",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('204', () => pm.response.to.have.status(204));"] } }],
+          "request": {
+            "method": "DELETE", "url": "{{base_url}}/products/{{product_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search, Filter, Sort, Pagination",
+      "item": [
+        { "name": "Search by name", "request": { "method": "GET", "url": "{{base_url}}/products?search=Keyboard" } },
+        { "name": "Filter by category slug", "request": { "method": "GET", "url": "{{base_url}}/products?category=electronics" } },
+        { "name": "Filter by nonexistent category (empty, not 404)", "request": { "method": "GET", "url": "{{base_url}}/products?category=does-not-exist" } },
+        { "name": "Sort ascending by price", "request": { "method": "GET", "url": "{{base_url}}/products?sort=price" } },
+        { "name": "Sort descending by price", "request": { "method": "GET", "url": "{{base_url}}/products?sort=-price" } },
+        {
+          "name": "Sort - invalid column (422)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('422', () => pm.response.to.have.status(422));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/products?sort=bogus" }
+        },
+        { "name": "Pagination page 2", "request": { "method": "GET", "url": "{{base_url}}/products?page=2&limit=5" } },
+        {
+          "name": "Pagination - oversized limit capped",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('limit capped to 100', () => pm.expect(pm.response.json().meta.limit).to.eql(100));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/products?limit=99999" }
+        },
+        {
+          "name": "Pagination - invalid page (422)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('422', () => pm.response.to.have.status(422));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/products?page=abc" }
+        }
+      ]
+    },
+    {
+      "name": "Protocol-level errors",
+      "item": [
+        {
+          "name": "Unknown route (404)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('404', () => pm.response.to.have.status(404));"] } }],
+          "request": { "method": "GET", "url": "{{base_url}}/nope" }
+        },
+        {
+          "name": "Unsupported method (405)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('405', () => pm.response.to.have.status(405));"] } }],
+          "request": { "method": "POST", "url": "{{base_url}}/health" }
+        },
+        {
+          "name": "Malformed JSON body (400)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] } }],
+          "request": {
+            "method": "POST", "url": "{{base_url}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{bad json" }
+          }
+        }
+      ]
+    }
+  ]
+}
