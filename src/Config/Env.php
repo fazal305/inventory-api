@@ -8,6 +8,13 @@ namespace App\Config;
  * Minimal .env loader: reads KEY=VALUE lines into getenv()/$_ENV so the rest
  * of the app never touches the file directly. No external dependency —
  * the parsing needed for this project's flat, quote-free .env is a dozen lines.
+ *
+ * A missing file is not an error: locally, a real .env file is the
+ * convenient way to set config (copy .env.example, edit, done). On a host
+ * like Render, there is no .env file at all — configuration is injected
+ * directly into the process environment via the platform's dashboard, and
+ * getenv() already sees it without this class doing anything. Throwing
+ * here would break every such deployment for no reason.
  */
 final class Env
 {
@@ -20,7 +27,8 @@ final class Env
         }
 
         if (!is_file($path)) {
-            throw new \RuntimeException("Environment file not found: {$path}. Copy .env.example to .env first.");
+            self::$loaded = true;
+            return;
         }
 
         foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
