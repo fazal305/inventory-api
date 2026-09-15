@@ -7,6 +7,10 @@ client (Postman today, a React app later) consumes over HTTP + JSON.
 
 There is no server-rendered dashboard. The API is the product.
 
+**Live**: `https://inventory-api-guxd.onrender.com/api/v1` (Render free
+tier — the first request after a period of inactivity can take 50+ seconds
+to wake up; see `docs/DEPLOYMENT.md`).
+
 ## Features
 
 - Token-based authentication (register / login / logout) with hashed,
@@ -26,7 +30,11 @@ There is no server-rendered dashboard. The API is the product.
 ## Tech Stack
 
 - PHP 8.4, plain (no framework)
-- MySQL 8.4, accessed via PDO with prepared statements
+- MySQL 8.4, accessed via PDO with prepared statements — the primary,
+  fully-documented database. Optional Postgres support
+  (`DB_CONNECTION=pgsql`) also exists, added specifically because the live
+  deployment's host offers managed Postgres but not managed MySQL; see
+  `docs/DEPLOYMENT.md`
 - No Composer dependency in this environment (see **Notes on environment
   constraints** below) — PSR-4-style autoloading and `.env` loading are
   hand-rolled in ~15 and ~35 lines respectively; swapping in Composer later
@@ -159,6 +167,13 @@ up after itself.
   request/response shape, and error codes
 - [docs/postman_collection.json](docs/postman_collection.json) — importable
   Postman collection
+
+## Deployment
+
+Live on Render — full details, environment variables, the Docker setup
+(Render has no native PHP runtime), and a real bug the deployment caught
+(`.env` loading assumed a file that doesn't exist on this host):
+**[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 ## Security
 
